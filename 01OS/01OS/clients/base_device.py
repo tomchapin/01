@@ -63,7 +63,6 @@ send_queue = queue.Queue()
 class Device:
     def __init__(self):
         self.pressed_keys = set()
-        self.captured_images = []
         self.audiosegments = []
 
     def fetch_image_from_camera(self, camera_index=CAMERA_DEVICE_INDEX):
@@ -83,10 +82,8 @@ class Device:
         if ret:
             temp_dir = tempfile.gettempdir()
             image_path = os.path.join(temp_dir, f"01_photo_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.png")
-            self.captured_images.append(image_path)
             cv2.imwrite(image_path, frame)
             logger.info(f"Camera image captured to {image_path}")
-            logger.info(f"You now have {len(self.captured_images)} images which will be sent along with your next audio message.")
         else:
             logger.error(f"Error: Couldn't capture an image from camera ({camera_index})")
 
@@ -103,6 +100,7 @@ class Device:
     def add_image_to_send_queue(self, image_path):
         """Encodes an image and adds an LMC message to the send queue with the image data."""
         base64_image = self.encode_image_to_base64(image_path)
+        send_queue.put({"role": "user", "type": "image", "format": "base64.png", "start": True})
         image_message = {
             "role": "user",
             "type": "image",
@@ -110,14 +108,7 @@ class Device:
             "content": base64_image
         }
         send_queue.put(image_message)
-        # Delete the image file from the file system after sending it
-        os.remove(image_path)
-
-    def queue_all_captured_images(self):
-        """Queues all captured images to be sent."""
-        for image_path in self.captured_images:
-            self.add_image_to_send_queue(image_path)
-        self.captured_images.clear()  # Clear the list after sending
+        send_queue.put({"role": "user", "type": "image", "format": "base64.png", "end": True})
 
         
     async def play_audiosegments(self):
@@ -178,8 +169,6 @@ class Device:
                 send_queue.put({"role": "user", "type": "audio", "format": "bytes.wav", "content": ""})
                 send_queue.put({"role": "user", "type": "audio", "format": "bytes.wav", "end": True})
         else:
-            self.queue_all_captured_images()
-
             if os.getenv('STT_RUNNER') == "client":
                 # Run stt then send text
                 text = stt_wav(wav_path)
@@ -226,7 +215,8 @@ class Device:
         if key == keyboard.Key.space:
             self.toggle_recording(False)
         elif CAMERA_ENABLED and key == keyboard.KeyCode.from_char('c'):
-            self.fetch_image_from_camera()
+            image_path = self.fetch_image_from_camera()
+            self.add_image_to_send_queue(image_path)
 
     
     async def message_sender(self, websocket):
