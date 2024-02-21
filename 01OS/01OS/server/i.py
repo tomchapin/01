@@ -24,7 +24,8 @@ def configure_interpreter(interpreter: OpenInterpreter):
 
     # Hosted settings
     interpreter.llm.api_key = os.getenv('OPENAI_API_KEY')
-    interpreter.llm.model = "gpt-4"
+    interpreter.llm.model = "gpt-4-vision-preview"
+    interpreter.llm.supports_vision = True
 
     ### MISC SETTINGS
 
