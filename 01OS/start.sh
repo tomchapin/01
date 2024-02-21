@@ -77,6 +77,7 @@ fi
 ### SKILLS PATH
 
 OI_SKILLS_PATH="$SCRIPT_DIR/01OS/server/skills"
+export OI_SKILLS_PATH
 
 ### SETUP
 
